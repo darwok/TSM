@@ -19,12 +19,13 @@ public class PlayerPrototypeController : MonoBehaviour
 
     [Header("Mecánica de Destello (Flash / Disparo)")]
     public Light flashLight;
-    public float cameraFlashDuration = 0.25f;
-    public float cameraFlashIntensity = 4f;
-    public float flashCooldown = 1.5f;
+    public float cameraFlashDuration = 1f;
+    public float cameraFlashIntensity = 5f;
+    public float flashCooldown = 1f;
 
     [Header("Combate y Munición")]
     public int ammo = 5;
+    public int ammoPerPickup = 3;
     public float gunFlashDuration = 0.08f;
     public float gunFlashIntensity = 7f;
     public float shootRange = 20f;
@@ -90,7 +91,6 @@ public class PlayerPrototypeController : MonoBehaviour
         Vector3 move = transform.right * inputMove.x + transform.forward * inputMove.y;
         controller.SimpleMove(move * moveSpeed);
 
-        // Si el jugador se mueve, emite ruido cercano
         if (inputMove.sqrMagnitude > 0.1f)
         {
             AlertarEnemigos(walkNoiseRadius);
@@ -141,11 +141,12 @@ public class PlayerPrototypeController : MonoBehaviour
         AlertarEnemigos(gunshotAlertRadius);
         Debug.Log("¡Disparo! Munición restante: " + ammo);
 
+        // Primero verificamos el impacto y luego alertamos, o EnemyBlindAI ignora estímulos si ya fue desactivado
         Ray ray = new Ray(playerCamera.position, playerCamera.forward);
         if (Physics.Raycast(ray, out RaycastHit hit, shootRange))
         {
             EnemyBlindAI enemy = hit.collider.GetComponent<EnemyBlindAI>();
-            if (enemy != null)
+            if (enemy != null && enemy.gameObject.activeInHierarchy)
             {
                 enemy.RecibirDisparo();
             }
@@ -179,7 +180,7 @@ public class PlayerPrototypeController : MonoBehaviour
         foreach (Collider col in hits)
         {
             EnemyBlindAI enemy = col.GetComponent<EnemyBlindAI>();
-            if (enemy != null)
+            if (enemy != null && enemy.gameObject.activeInHierarchy)
             {
                 enemy.EscucharEstímulo(transform.position);
             }
@@ -188,11 +189,19 @@ public class PlayerPrototypeController : MonoBehaviour
 
     void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        if (hit.gameObject.CompareTag("Ammo"))
+        if (hit.gameObject.CompareTag("Ammo") && hit.gameObject.activeInHierarchy)
         {
-            ammo += 3;
-            Destroy(hit.gameObject);
+            ammo += ammoPerPickup;
             Debug.Log("Munición recolectada. Total: " + ammo);
+
+            if (EnemyAndAmmoPoolManager.Instance != null)
+            {
+                EnemyAndAmmoPoolManager.Instance.ReturnAmmoToPool(hit.gameObject);
+            }
+            else
+            {
+                hit.gameObject.SetActive(false);
+            }
         }
     }
 }
